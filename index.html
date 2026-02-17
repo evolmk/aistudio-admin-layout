@@ -1,0 +1,573 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lazar Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            overflow-x: hidden;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        
+        .sidebar-transition {
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .spin-slow { animation: spin 3s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+<script type="importmap">
+{
+  "imports": {
+    "rxjs": "https://esm.sh/rxjs@^7.8.2?conditions=es2015",
+    "rxjs/operators": "https://esm.sh/rxjs@^7.8.2/operators?conditions=es2015",
+    "rxjs/ajax": "https://esm.sh/rxjs@^7.8.2/ajax?conditions=es2015",
+    "rxjs/webSocket": "https://esm.sh/rxjs@^7.8.2/webSocket?conditions=es2015",
+    "rxjs/testing": "https://esm.sh/rxjs@^7.8.2/testing?conditions=es2015",
+    "rxjs/fetch": "https://esm.sh/rxjs@^7.8.2/fetch?conditions=es2015",
+    "@angular/compiler": "https://esm.sh/@angular/compiler@^21.1.4?external=rxjs",
+    "@angular/core": "https://esm.sh/@angular/core@^21.1.4?external=rxjs",
+    "@angular/platform-browser": "https://esm.sh/@angular/platform-browser@^21.1.4?external=rxjs",
+    "@angular/common": "https://esm.sh/@angular/common@^21.1.4?external=rxjs"
+  }
+}
+</script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<!-- App State & Logic -->
+<script>
+    // State
+    let sidebarCollapsed = false;
+    let searchOpen = false;
+    let currentView = 'dashboard';
+
+    // Icons Map (Heroicons Outline)
+    const icons = {
+        dashboard: `<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />`,
+        orders: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />`,
+        quotes: `<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />`,
+        customers: `<path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />`,
+        vendors: `<path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />`,
+        parts: `<path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />`,
+        machines: `<path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />`,
+        media: `<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />`,
+        drawings: `<path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />`,
+        search: `<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />`,
+        bell: `<path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />`,
+        sun: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />`,
+        plus: `<path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />`,
+        chevronUpDown: `<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />`,
+        trendingUp: `<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 005.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />`,
+        trendingDown: `<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6L9 12.75l4.286-4.286a11.948 11.948 0 015.834 5.518l2.74 1.22m0 0l-5.94 2.28m5.94-2.28l-2.28-5.941" />`,
+        more: `<path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />`,
+        refreshCw: `<path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />`,
+        checkCircle: `<path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />`
+    };
+
+    function getIcon(name, size = 5, className = "") {
+        return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-${size} h-${size} ${className}">${icons[name] || ''}</svg>`;
+    }
+
+    // Toggle Functions
+    function toggleSidebar() {
+        sidebarCollapsed = !sidebarCollapsed;
+        updateUI();
+    }
+
+    function toggleSearch() {
+        searchOpen = !searchOpen;
+        const modal = document.getElementById('search-modal');
+        if (searchOpen) {
+            modal.classList.remove('hidden');
+        } else {
+            modal.classList.add('hidden');
+        }
+    }
+
+    function setView(viewId) {
+        currentView = viewId;
+        // For now, we only have one real view rendered, but we update the active state in nav
+        updateUI();
+        // On mobile, close sidebar
+        if (window.innerWidth < 1024) {
+            sidebarCollapsed = true;
+            updateUI();
+        }
+    }
+
+    // UI Updates
+    function updateUI() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        const main = document.querySelector('main');
+        
+        // Mobile Overlay
+        if (!sidebarCollapsed && window.innerWidth < 1024) {
+            overlay.classList.remove('hidden');
+        } else {
+            overlay.classList.add('hidden');
+        }
+
+        // Sidebar Width & State
+        // Desktop: w-64 vs w-20. Mobile: translate-x-0 vs -translate-x-full
+        if (window.innerWidth >= 1024) {
+             // Desktop
+             if (sidebarCollapsed) {
+                 sidebar.classList.remove('w-64');
+                 sidebar.classList.add('w-20');
+                 // Hide logos/text
+                 document.querySelectorAll('.sidebar-text').forEach(el => el.classList.add('hidden'));
+                 document.querySelectorAll('.sidebar-logo-full').forEach(el => el.classList.add('hidden'));
+                 document.querySelectorAll('.sidebar-logo-collapsed').forEach(el => el.classList.remove('hidden'));
+                 document.querySelectorAll('.sidebar-toggle-btn').forEach(el => el.classList.remove('justify-between'));
+                 document.querySelectorAll('.sidebar-toggle-btn').forEach(el => el.classList.add('justify-center'));
+                 document.querySelectorAll('.create-btn-full').forEach(el => el.classList.add('hidden'));
+                 document.querySelectorAll('.create-btn-icon').forEach(el => el.classList.remove('hidden'));
+             } else {
+                 sidebar.classList.remove('w-20');
+                 sidebar.classList.add('w-64');
+                 // Show logos/text
+                 document.querySelectorAll('.sidebar-text').forEach(el => el.classList.remove('hidden'));
+                 document.querySelectorAll('.sidebar-logo-full').forEach(el => el.classList.remove('hidden'));
+                 document.querySelectorAll('.sidebar-logo-collapsed').forEach(el => el.classList.add('hidden'));
+                 document.querySelectorAll('.sidebar-toggle-btn').forEach(el => el.classList.add('justify-between'));
+                 document.querySelectorAll('.sidebar-toggle-btn').forEach(el => el.classList.remove('justify-center'));
+                 document.querySelectorAll('.create-btn-full').forEach(el => el.classList.remove('hidden'));
+                 document.querySelectorAll('.create-btn-icon').forEach(el => el.classList.add('hidden'));
+             }
+        } else {
+            // Mobile
+            if (sidebarCollapsed) {
+                sidebar.classList.add('-translate-x-full');
+            } else {
+                sidebar.classList.remove('-translate-x-full');
+            }
+        }
+
+        // Nav Active States
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            const id = btn.getAttribute('data-id');
+            const icon = btn.querySelector('.nav-icon');
+            
+            if (id === currentView) {
+                btn.classList.add('text-blue-600');
+                if (!sidebarCollapsed && window.innerWidth >= 1024) btn.classList.add('bg-blue-50');
+                btn.classList.remove('text-slate-500', 'hover:bg-slate-50', 'hover:text-slate-900');
+                icon.classList.remove('text-slate-400', 'group-hover:text-slate-600');
+                icon.classList.add('text-blue-600');
+            } else {
+                btn.classList.remove('text-blue-600', 'bg-blue-50');
+                btn.classList.add('text-slate-500', 'hover:bg-slate-50', 'hover:text-slate-900');
+                icon.classList.add('text-slate-400', 'group-hover:text-slate-600');
+                icon.classList.remove('text-blue-600');
+            }
+        });
+    }
+
+    // Charting with D3
+    function initCharts() {
+        const container = document.getElementById('chart-container');
+        if (!container) return;
+        
+        container.innerHTML = ''; // clear
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const margin = { top: 20, right: 0, bottom: 30, left: 0 };
+        
+        const svg = d3.select(container).append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Data
+        const points = 15;
+        const data = Array.from({ length: points }, (_, i) => {
+            let val = 150 + Math.sin(i / 2) * 100 + Math.random() * 20;
+            if (i > 5 && i < 10) val += 100; 
+            return {
+                date: new Date(2024, 3, i * 2 + 1),
+                value: Math.max(50, val)
+            };
+        });
+
+        const x = d3.scaleTime().domain(d3.extent(data, d => d.date)).range([0, width]);
+        const y = d3.scaleLinear().domain([0, 400]).range([height - margin.top - margin.bottom, 0]);
+
+        // Gradient
+        const defs = svg.append("defs");
+        const gradient = defs.append("linearGradient")
+            .attr("id", "blue-gradient")
+            .attr("x1", "0%").attr("y1", "0%").attr("x2", "0%").attr("y2", "100%");
+        gradient.append("stop").attr("offset", "0%").attr("stop-color", "#3B82F6").attr("stop-opacity", 0.4);
+        gradient.append("stop").attr("offset", "100%").attr("stop-color", "#3B82F6").attr("stop-opacity", 0);
+
+        const area = d3.area()
+            .x(d => x(d.date))
+            .y0(height - margin.top - margin.bottom)
+            .y1(d => y(d.value))
+            .curve(d3.curveMonotoneX);
+
+        const line = d3.line()
+            .x(d => x(d.date))
+            .y(d => y(d.value))
+            .curve(d3.curveMonotoneX);
+
+        svg.append("path").datum(data).attr("fill", "url(#blue-gradient)").attr("d", area);
+        svg.append("path").datum(data).attr("fill", "none").attr("stroke", "#3B82F6").attr("stroke-width", 3).attr("d", line);
+        
+        // X Axis
+        const xAxis = d3.axisBottom(x).ticks(10).tickFormat(d3.timeFormat("%b %d")).tickSize(0).tickPadding(15);
+        svg.append("g").attr("transform", `translate(0,${height - margin.top - margin.bottom})`).call(xAxis).call(g => g.select(".domain").remove()).attr("font-family", "Inter").attr("font-size", "10px").attr("color", "#94A3B8");
+    }
+
+    // Init
+    window.addEventListener('DOMContentLoaded', () => {
+        updateUI();
+        initCharts();
+        window.addEventListener('resize', () => {
+            updateUI();
+            initCharts();
+        });
+        
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                toggleSearch();
+            }
+            if (e.key === 'Escape' && searchOpen) {
+                toggleSearch();
+            }
+        });
+    });
+
+</script>
+
+<!-- Mobile Overlay -->
+<div id="mobile-overlay" class="fixed inset-0 bg-slate-900/50 z-20 hidden lg:hidden backdrop-blur-sm transition-opacity" onclick="toggleSidebar()"></div>
+
+<!-- Search Modal -->
+<div id="search-modal" class="fixed inset-0 bg-slate-900/40 z-50 backdrop-blur-[2px] hidden flex items-start justify-center pt-[15vh]" onclick="toggleSearch()">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-in-up border border-slate-200" onclick="event.stopPropagation()">
+        <div class="p-4 border-b border-slate-100 flex items-center gap-3">
+            <script>document.write(getIcon('search', 6, 'text-slate-400'))</script>
+            <input type="text" placeholder="Search commands, pages, or files..." class="flex-1 bg-transparent text-lg outline-none placeholder-slate-400 text-slate-900 h-10" autofocus>
+            <span class="text-xs font-semibold text-slate-400 border border-slate-200 rounded px-2 py-1">ESC</span>
+        </div>
+        <div class="p-2">
+            <p class="px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Recent</p>
+            <button class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg flex items-center gap-2">
+                <script>document.write(getIcon('dashboard', 4))</script> Dashboard
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="flex min-h-screen relative">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed lg:sticky top-0 left-0 z-30 h-screen bg-white border-r border-slate-200 sidebar-transition flex flex-col w-64 -translate-x-full lg:translate-x-0">
+        
+        <!-- Header -->
+        <div class="h-16 flex items-center shrink-0 px-4 sidebar-toggle-btn justify-between">
+             <span class="font-extrabold text-2xl tracking-tight text-slate-900 ml-2 sidebar-logo-full">LAZAR</span>
+             <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg transition-colors">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5"><path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z"></path></svg>
+             </button>
+        </div>
+
+        <!-- Create Button -->
+        <div class="px-4 mb-4 mt-2 shrink-0">
+            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md shadow-blue-500/30 create-btn-full">
+                <script>document.write(getIcon('plus', 5))</script>
+                Create New
+            </button>
+            <button class="w-10 h-10 mx-auto bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition-all shadow-md shadow-blue-500/30 create-btn-icon hidden">
+                <script>document.write(getIcon('plus', 6))</script>
+            </button>
+        </div>
+
+        <!-- Nav -->
+        <nav class="flex-1 overflow-y-auto px-2 space-y-4 pb-4 custom-scrollbar">
+            <!-- Group 1 -->
+            <div>
+                 <ul class="space-y-0.5">
+                     <li>
+                         <button onclick="setView('dashboard')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="dashboard">
+                             <span class="nav-icon"><script>document.write(getIcon('dashboard', 5))</script></span>
+                             <span class="ml-3 text-sm font-medium sidebar-text">Dashboard</span>
+                         </button>
+                     </li>
+                 </ul>
+            </div>
+            <!-- Group 2 -->
+             <div>
+                 <h4 class="px-4 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Commercial</h4>
+                 <ul class="space-y-0.5">
+                     <li><button onclick="setView('orders')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="orders"><span class="nav-icon"><script>document.write(getIcon('orders', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Orders</span></button></li>
+                     <li><button onclick="setView('quotes')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="quotes"><span class="nav-icon"><script>document.write(getIcon('quotes', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Quotes</span></button></li>
+                     <li><button onclick="setView('customers')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="customers"><span class="nav-icon"><script>document.write(getIcon('customers', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Customers</span></button></li>
+                     <li><button onclick="setView('vendors')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="vendors"><span class="nav-icon"><script>document.write(getIcon('vendors', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Vendors</span></button></li>
+                 </ul>
+            </div>
+            <!-- Group 3 -->
+            <div>
+                 <h4 class="px-4 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Inventory</h4>
+                 <ul class="space-y-0.5">
+                     <li><button onclick="setView('parts')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="parts"><span class="nav-icon"><script>document.write(getIcon('parts', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Parts</span></button></li>
+                     <li><button onclick="setView('machines')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="machines"><span class="nav-icon"><script>document.write(getIcon('machines', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Machines</span></button></li>
+                 </ul>
+            </div>
+            <!-- Group 4 -->
+            <div>
+                 <h4 class="px-4 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider sidebar-text">Assets</h4>
+                 <ul class="space-y-0.5">
+                     <li><button onclick="setView('media')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="media"><span class="nav-icon"><script>document.write(getIcon('media', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Media</span></button></li>
+                     <li><button onclick="setView('drawings')" class="nav-item w-full flex items-center rounded-lg transition-all group relative px-3 py-1.5" data-id="drawings"><span class="nav-icon"><script>document.write(getIcon('drawings', 5))</script></span><span class="ml-3 text-sm font-medium sidebar-text">Drawings</span></button></li>
+                 </ul>
+            </div>
+        </nav>
+
+        <!-- Profile -->
+        <div class="p-4 border-t border-slate-200 shrink-0">
+            <button class="flex items-center w-full group outline-none justify-start sidebar-toggle-btn">
+                <div class="relative shrink-0">
+                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-sm">AK</div>
+                    <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                </div>
+                <div class="ml-3 text-left flex-1 overflow-hidden sidebar-text">
+                    <p class="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">Alex Knight</p>
+                    <p class="text-xs text-slate-500 truncate">alex@lazar.com</p>
+                </div>
+                <div class="sidebar-text">
+                     <script>document.write(getIcon('chevronUpDown', 4, 'text-slate-400 group-hover:text-slate-600'))</script>
+                </div>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+        <!-- Header -->
+        <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <div class="flex items-center gap-1 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded-md transition-colors -ml-2">
+                        <span class="text-[20px] font-bold text-slate-900">Dashboard</span>
+                        <script>document.write(getIcon('chevronUpDown', 5, 'text-slate-400 mt-1'))</script>
+                    </div>
+                    <span class="text-slate-300 text-[20px]">/</span>
+                    <span class="text-[20px] font-normal text-slate-500">Overview</span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-6">
+                <!-- Search -->
+                <div onclick="toggleSearch()" class="hidden md:flex relative group cursor-pointer">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <script>document.write(getIcon('search', 5, 'text-slate-400'))</script>
+                    </div>
+                    <input type="text" readonly placeholder="Search..." class="cursor-pointer pl-10 pr-12 py-2 bg-slate-100 border border-transparent hover:bg-slate-200 rounded-lg text-sm w-64 transition-all placeholder-slate-400 text-slate-700">
+                    <div class="absolute inset-y-0 right-1.5 flex items-center pointer-events-none">
+                        <span class="text-[10px] font-bold text-slate-500 border border-slate-200 rounded px-1.5 py-0.5 bg-white shadow-sm tracking-wide">⌘ K</span>
+                    </div>
+                </div>
+                <!-- Icons -->
+                <div class="flex items-center gap-4">
+                    <button class="text-slate-400 hover:text-slate-600 transition-colors"><script>document.write(getIcon('sun', 5))</script></button>
+                    <button class="text-slate-400 hover:text-slate-600 relative transition-colors">
+                        <script>document.write(getIcon('bell', 5))</script>
+                        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+                    </button>
+                    <button class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center transition-colors">AK</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content -->
+        <div id="main-content" class="flex-1 overflow-auto p-4 lg:p-8 scroll-smooth bg-slate-50/50">
+            
+            <!-- Dashboard View -->
+            <div class="space-y-6 animate-fade-in-up">
+                <!-- KPI Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Cards -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
+                        <div class="flex items-start justify-between mb-2">
+                            <h3 class="text-sm font-medium text-slate-500 tracking-wide">Total Revenue</h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+                                <script>document.write(getIcon('trendingUp', 3, 'mr-1'))</script> +12.5%
+                            </span>
+                        </div>
+                        <div class="my-1"><h2 class="text-2xl font-bold text-slate-900 tracking-tight">$1,250.00</h2></div>
+                        <div class="flex items-center text-xs mt-2"><span class="text-slate-500 font-medium flex items-center gap-1"><script>document.write(getIcon('trendingUp', 3, 'text-emerald-500'))</script> Trending up this month</span></div>
+                    </div>
+                    
+                     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
+                        <div class="flex items-start justify-between mb-2">
+                            <h3 class="text-sm font-medium text-slate-500 tracking-wide">New Customers</h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600">
+                                <script>document.write(getIcon('trendingDown', 3, 'mr-1'))</script> -20%
+                            </span>
+                        </div>
+                        <div class="my-1"><h2 class="text-2xl font-bold text-slate-900 tracking-tight">1,234</h2></div>
+                        <div class="flex items-center text-xs mt-2"><span class="text-slate-500 font-medium flex items-center gap-1"><script>document.write(getIcon('trendingDown', 3, 'text-red-500'))</script> Down 20% this period</span></div>
+                    </div>
+
+                     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
+                        <div class="flex items-start justify-between mb-2">
+                            <h3 class="text-sm font-medium text-slate-500 tracking-wide">Active Accounts</h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+                                <script>document.write(getIcon('trendingUp', 3, 'mr-1'))</script> +12.5%
+                            </span>
+                        </div>
+                        <div class="my-1"><h2 class="text-2xl font-bold text-slate-900 tracking-tight">45,678</h2></div>
+                        <div class="flex items-center text-xs mt-2"><span class="text-slate-500 font-medium flex items-center gap-1"><script>document.write(getIcon('trendingUp', 3, 'text-emerald-500'))</script> Strong user retention</span></div>
+                    </div>
+
+                     <div class="bg-white rounded-xl border border-slate-200 p-5 shadow-sm hover:shadow-md transition-all h-full flex flex-col justify-between">
+                        <div class="flex items-start justify-between mb-2">
+                            <h3 class="text-sm font-medium text-slate-500 tracking-wide">Growth Rate</h3>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600">
+                                <script>document.write(getIcon('trendingUp', 3, 'mr-1'))</script> +4.5%
+                            </span>
+                        </div>
+                        <div class="my-1"><h2 class="text-2xl font-bold text-slate-900 tracking-tight">4.5%</h2></div>
+                        <div class="flex items-center text-xs mt-2"><span class="text-slate-500 font-medium flex items-center gap-1"><script>document.write(getIcon('trendingUp', 3, 'text-emerald-500'))</script> Meets growth projections</span></div>
+                    </div>
+                </div>
+
+                <!-- Chart Section -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-6 hover:shadow-md transition-shadow duration-300 h-full">
+                    <div class="flex flex-col md:flex-row justify-between md:items-start mb-6 gap-4">
+                        <div>
+                            <h3 class="text-xl font-bold text-slate-900">Total Visitors</h3>
+                            <p class="text-slate-500 text-sm mt-1">Total for the last 3 months</p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="bg-white border border-slate-200 rounded-lg p-2 shadow-sm text-xs space-y-1 hidden md:block">
+                                <div class="font-semibold text-slate-700 mb-1">Mar 31</div>
+                                <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span><span class="text-slate-500">Mobile</span><span class="font-medium">150</span></div>
+                                <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-200"></span><span class="text-slate-500">Desktop</span><span class="font-medium">222</span></div>
+                            </div>
+                            <div class="flex bg-slate-100 p-1 rounded-lg">
+                                <button class="px-3 py-1 text-xs font-medium rounded-md bg-white shadow-sm text-slate-900">3 months</button>
+                                <button class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-900">30 days</button>
+                                <button class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-900">7 days</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="chart-container" class="w-full h-[300px] relative"></div>
+                </div>
+
+                <!-- Table Section -->
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex items-center gap-6">
+                            <button class="text-sm font-semibold text-slate-900 border-b-2 border-blue-600 pb-4 -mb-4.5 z-10">Outline</button>
+                            <button class="text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 -mb-4 flex items-center gap-1">Past Performance <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">3</span></button>
+                            <button class="text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 -mb-4 flex items-center gap-1">Key Personnel <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">2</span></button>
+                            <button class="text-sm font-medium text-slate-500 hover:text-slate-700 pb-4 -mb-4">Focus Documents</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                             <button class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">View</button>
+                             <button class="inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 focus:outline-none bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm">Add Section</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50/50 border-b border-slate-100">
+                                <tr>
+                                    <th class="p-4 w-4"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"></th>
+                                    <th class="px-6 py-3 font-semibold">HEADER</th>
+                                    <th class="px-6 py-3 font-semibold">SECTION TYPE</th>
+                                    <th class="px-6 py-3 font-semibold">STATUS</th>
+                                    <th class="px-6 py-3 font-semibold text-center">TARGET</th>
+                                    <th class="px-6 py-3 font-semibold text-center">LIMIT</th>
+                                    <th class="px-6 py-3 font-semibold">REVIEWER</th>
+                                    <th class="px-6 py-3 w-10"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-50">
+                                <tr class="hover:bg-slate-50 transition-colors group">
+                                    <td class="p-4"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"></td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">Cover page</td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600">Cover page</span></td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><script>document.write(getIcon('refreshCw', 3, 'spin-slow'))</script> In Process</span></td>
+                                    <td class="px-6 py-4 text-center text-slate-600">18</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">5</td>
+                                    <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">EL</div><span class="text-slate-600 text-xs">Eddie Lake</span></div></td>
+                                    <td class="px-6 py-4"><button class="text-slate-400 hover:text-slate-600"><script>document.write(getIcon('more', 4))</script></button></td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors group">
+                                    <td class="p-4"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"></td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">Table of contents</td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600">Table of contents</span></td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"><script>document.write(getIcon('checkCircle', 3))</script> Done</span></td>
+                                    <td class="px-6 py-4 text-center text-slate-600">29</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">24</td>
+                                    <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">EL</div><span class="text-slate-600 text-xs">Eddie Lake</span></div></td>
+                                    <td class="px-6 py-4"><button class="text-slate-400 hover:text-slate-600"><script>document.write(getIcon('more', 4))</script></button></td>
+                                </tr>
+                                 <tr class="hover:bg-slate-50 transition-colors group">
+                                    <td class="p-4"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"></td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">Executive summary</td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600">Narrative</span></td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"><script>document.write(getIcon('checkCircle', 3))</script> Done</span></td>
+                                    <td class="px-6 py-4 text-center text-slate-600">10</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">13</td>
+                                    <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">EL</div><span class="text-slate-600 text-xs">Eddie Lake</span></div></td>
+                                    <td class="px-6 py-4"><button class="text-slate-400 hover:text-slate-600"><script>document.write(getIcon('more', 4))</script></button></td>
+                                </tr>
+                                 <tr class="hover:bg-slate-50 transition-colors group">
+                                    <td class="p-4"><input type="checkbox" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"></td>
+                                    <td class="px-6 py-4 font-medium text-slate-900">Technical Approach</td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-600">Narrative</span></td>
+                                    <td class="px-6 py-4"><span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"><script>document.write(getIcon('checkCircle', 3))</script> Done</span></td>
+                                    <td class="px-6 py-4 text-center text-slate-600">27</td>
+                                    <td class="px-6 py-4 text-center text-slate-600">32</td>
+                                    <td class="px-6 py-4"><div class="flex items-center gap-2"><div class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold">JK</div><span class="text-slate-600 text-xs">Jamik</span></div></td>
+                                    <td class="px-6 py-4"><button class="text-slate-400 hover:text-slate-600"><script>document.write(getIcon('more', 4))</script></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+
+</body>
+</html>

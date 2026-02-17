@@ -1,0 +1,196 @@
+
+<div class="min-h-screen bg-slate-50 flex font-sans text-slate-900">
+
+  <!-- Mobile Overlay -->
+  <div *ngIf="!sidebarCollapsed()" class="fixed inset-0 bg-slate-900/50 z-20 lg:hidden backdrop-blur-sm transition-opacity" (click)="toggleSidebar()"></div>
+
+  <!-- Search Modal Overlay -->
+  @if (searchOpen()) {
+    <div class="fixed inset-0 bg-slate-900/40 z-50 backdrop-blur-[2px] flex items-start justify-center pt-[15vh]" (click)="toggleSearch()">
+      <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-in-up border border-slate-200" (click)="$event.stopPropagation()">
+        <div class="p-4 border-b border-slate-100 flex items-center gap-3">
+          <app-icon name="search" [size]="6" class="text-slate-400"></app-icon>
+          <input 
+            type="text" 
+            placeholder="Search commands, pages, or files..." 
+            class="flex-1 bg-transparent text-lg outline-none placeholder-slate-400 text-slate-900 h-10"
+            autofocus
+          >
+          <span class="text-xs font-semibold text-slate-400 border border-slate-200 rounded px-2 py-1">ESC</span>
+        </div>
+        <div class="p-2">
+          <p class="px-3 py-2 text-xs font-semibold text-slate-400 uppercase">Recent</p>
+          <button class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg flex items-center gap-2">
+            <app-icon name="dashboard" [size]="4"></app-icon> Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Sidebar -->
+  <aside 
+    class="fixed lg:sticky top-0 left-0 z-30 h-screen bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex flex-col"
+    [class.w-20]="sidebarCollapsed()"
+    [class.w-64]="!sidebarCollapsed()"
+    [class.-translate-x-full]="sidebarCollapsed()"
+    [class.translate-x-0]="!sidebarCollapsed()"
+    [class.lg:translate-x-0]="true">
+    
+    <!-- Sidebar Header (Logo/Toggle) -->
+    <div class="h-16 flex items-center shrink-0 px-4" 
+         [class.justify-center]="sidebarCollapsed()" 
+         [class.justify-between]="!sidebarCollapsed()">
+      
+      @if (!sidebarCollapsed()) {
+        <!-- Open State: Logo Left, Toggle Right -->
+        <span class="font-extrabold text-2xl tracking-tight text-slate-900 ml-2">LAZAR</span>
+        
+        <button (click)="toggleSidebar()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg transition-colors">
+           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5"><path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z"></path></svg>
+        </button>
+      } @else {
+        <!-- Collapsed State: Centered Toggle -->
+        <button (click)="toggleSidebar()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg transition-colors">
+           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6"><path d="M16.5 4C17.3284 4 18 4.67157 18 5.5V14.5C18 15.3284 17.3284 16 16.5 16H3.5C2.67157 16 2 15.3284 2 14.5V5.5C2 4.67157 2.67157 4 3.5 4H16.5ZM7 15H16.5C16.7761 15 17 14.7761 17 14.5V5.5C17 5.22386 16.7761 5 16.5 5H7V15ZM3.5 5C3.22386 5 3 5.22386 3 5.5V14.5C3 14.7761 3.22386 15 3.5 15H6V5H3.5Z"></path></svg>
+        </button>
+      }
+    </div>
+
+    <!-- Create Button -->
+    <div class="px-4 mb-4 mt-2 shrink-0" [class.px-2]="sidebarCollapsed()">
+       @if (sidebarCollapsed()) {
+         <button class="w-10 h-10 mx-auto bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition-all shadow-md shadow-blue-500/30">
+            <app-icon name="plus" [size]="6"></app-icon>
+         </button>
+       } @else {
+         <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md shadow-blue-500/30">
+            <app-icon name="plus" [size]="5"></app-icon>
+            Create New
+         </button>
+       }
+    </div>
+
+    <!-- Navigation List (Scrollable) -->
+    <nav class="flex-1 overflow-y-auto px-2 space-y-4 pb-4 custom-scrollbar">
+      
+      @for (group of menuGroups; track group.title) {
+        <div>
+          @if (!sidebarCollapsed() && group.title) {
+            <h4 class="px-4 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">{{ group.title }}</h4>
+          } @else if (sidebarCollapsed() && group.title) {
+            <!-- Separator for collapsed state -->
+            <div class="h-px bg-slate-100 mx-2 my-2"></div>
+          }
+
+          <ul class="space-y-0.5">
+            @for (item of group.items; track item.id) {
+              <li>
+                <button 
+                  (click)="setView(item.id)"
+                  class="w-full flex items-center rounded-lg transition-all group relative"
+                  [class.justify-center]="sidebarCollapsed()"
+                  [class.h-10]="sidebarCollapsed()"
+                  [class.px-3]="!sidebarCollapsed()"
+                  [class.py-1.5]="!sidebarCollapsed()"
+                  [class.text-blue-600]="currentView() === item.id"
+                  [class.bg-blue-50]="currentView() === item.id && !sidebarCollapsed()"
+                  [class.text-slate-500]="currentView() !== item.id"
+                  [class.hover:bg-slate-50]="currentView() !== item.id"
+                  [class.hover:text-slate-900]="currentView() !== item.id">
+                  
+                  <app-icon [name]="item.icon" [size]="5" [class]="currentView() === item.id ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'"></app-icon>
+                  
+                  @if (!sidebarCollapsed()) {
+                    <span class="ml-3 text-sm font-medium">{{ item.label }}</span>
+                  }
+                </button>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+      
+    </nav>
+
+    <!-- User Profile (Bottom) -->
+    <div class="p-4 border-t border-slate-200 shrink-0">
+       <button class="flex items-center w-full group outline-none" [class.justify-center]="sidebarCollapsed()">
+          <div class="relative shrink-0">
+             <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-sm">
+                AK
+             </div>
+             <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+          </div>
+
+          @if (!sidebarCollapsed()) {
+             <div class="ml-3 text-left flex-1 overflow-hidden">
+                <p class="text-sm font-semibold text-slate-900 truncate group-hover:text-blue-600 transition-colors">Alex Knight</p>
+                <p class="text-xs text-slate-500 truncate">alex&#64;lazar.com</p>
+             </div>
+             <app-icon name="chevronUpDown" [size]="4" class="text-slate-400 group-hover:text-slate-600"></app-icon>
+          }
+       </button>
+    </div>
+
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+    <!-- Top Header -->
+    <header class="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-8 z-10 sticky top-0">
+       <div class="flex items-center gap-4">
+          <!-- Breadcrumb: Dashboard (Bold) v / Overview -->
+          <div class="flex items-center gap-2">
+             <div class="flex items-center gap-1 cursor-pointer hover:bg-slate-50 px-2 py-1 rounded-md transition-colors -ml-2">
+               <span class="text-[20px] font-bold text-slate-900">Dashboard</span>
+               <app-icon name="chevronUpDown" [size]="5" class="text-slate-400 mt-1"></app-icon>
+             </div>
+             
+             <!-- Only show secondary breadcrumb if we have context, e.g. Overview -->
+             <span class="text-slate-300 text-[20px]">/</span>
+             <span class="text-[20px] font-normal text-slate-500">Overview</span>
+          </div>
+       </div>
+
+       <!-- Right Actions -->
+       <div class="flex items-center gap-6">
+          <!-- Spotlight Search Trigger -->
+          <div (click)="toggleSearch()" class="hidden md:flex relative group cursor-pointer">
+             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <app-icon name="search" [size]="5" class="text-slate-400"></app-icon>
+             </div>
+             <!-- Read-only input that acts as a button -->
+             <input type="text" readonly placeholder="Search..." class="cursor-pointer pl-10 pr-12 py-2 bg-slate-100 border border-transparent hover:bg-slate-200 rounded-lg text-sm w-64 transition-all placeholder-slate-400 text-slate-700">
+             <div class="absolute inset-y-0 right-1.5 flex items-center pointer-events-none">
+                <span class="text-[10px] font-bold text-slate-500 border border-slate-200 rounded px-1.5 py-0.5 bg-white shadow-sm tracking-wide">⌘ K</span>
+             </div>
+          </div>
+
+          <!-- Icons -->
+          <div class="flex items-center gap-4">
+            <button class="text-slate-400 hover:text-slate-600 transition-colors">
+              <app-icon name="sun" [size]="5"></app-icon>
+            </button>
+
+            <button class="text-slate-400 hover:text-slate-600 relative transition-colors">
+              <app-icon name="bell" [size]="5"></app-icon>
+              <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </button>
+            
+            <button class="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center transition-colors">
+              AK
+            </button>
+          </div>
+       </div>
+    </header>
+
+    <!-- Scrollable Content Area (Blank per request) -->
+    <div class="flex-1 overflow-auto p-4 lg:p-8 scroll-smooth bg-slate-50/50">
+       <!-- Content removed as requested -->
+       <div class="w-full h-full flex items-center justify-center text-slate-300">
+          <!-- Placeholder or just empty -->
+       </div>
+    </div>
+  </main>
+</div>
